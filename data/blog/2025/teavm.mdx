@@ -7,7 +7,7 @@ summary: TeaVM 是一个将 Java 字节码编译为 JavaScript 的工具，可�
 
 ## 前言
 
-今天无意间发现了 [slicer.run](https://slicer.run/) 这个网站，可以在线运行 Java 程序，觉得很有意思，于是就研究了一下。
+今天无意间发现了 [slicer.run](https://slicer.run/) 这个网站，可以在线运行反编译Java程序，比Recaf之类的方便很多。
 
 看到支持CFR, VineFlower等Java那边的反编译器，于是盲猜可能是用WASM跑了个Java虚拟机来运行的，但是打开F12, 发现没有任何wasm被加载，于是翻了翻源代码，发现了[TeaVM](https://teavm.org/)。
 
@@ -1069,9 +1069,7 @@ BN = b => {
 
 同时，TeaVM还生成了一些辅助函数用于支撑Java的一些语法
 
-例如:
-
-这里看起来应该是从字符串常量池中获取字符串
+例如, 这里看起来应该是从字符串常量池中获取字符串
 
 ```js
 X,
