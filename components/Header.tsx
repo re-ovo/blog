@@ -1,14 +1,14 @@
-import siteMetadata from '@/data/siteMetadata'
 import headerNavLinks from '@/data/headerNavLinks'
-import Logo from '@/data/logo.svg'
+import siteMetadata from '@/data/siteMetadata'
+import Image from 'next/image'
 import Link from './Link'
 import MobileNav from './MobileNav'
-import ThemeSwitch from './ThemeSwitch'
 import SearchButton from './SearchButton'
+import ThemeSwitch from './ThemeSwitch'
 
 const Header = () => {
   let headerClass =
-    'flex items-center w-full backdrop-blur-md bg-white/70 dark:bg-gray-950/50 justify-between py-1 px-4 border-b border-gray-200 dark:border-gray-800'
+    'flex items-center w-full backdrop-blur-md bg-white/70 dark:bg-gray-950/50 justify-between py-2 px-4 border-b border-gray-200 dark:border-gray-800'
   if (siteMetadata.stickyNav) {
     headerClass += ' sticky top-0 z-50'
   }
@@ -19,7 +19,7 @@ const Header = () => {
         <Link href="/" aria-label={siteMetadata.headerTitle}>
           <div className="flex items-center justify-between">
             <div className="mr-3">
-              <Logo />
+              <Image src={'/static/images/logo.svg'} alt="logo" width={32} height={32} />
             </div>
             {typeof siteMetadata.headerTitle === 'string' ? (
               <div className="hidden h-6 text-2xl font-semibold sm:block">
