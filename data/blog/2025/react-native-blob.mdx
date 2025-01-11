@@ -1,0 +1,39 @@
+---
+title: React Native Blob上传
+date: 2025-01-11
+tags: [React Native]
+summary: React Native Blob上传
+---
+
+记录下React Native中上传Blob的坑。
+
+1. 需要设置`Content-Type`为`multipart/form-data`
+```js
+const upload = async (formData) => {
+  const response = await axios.post('http://localhost:3000/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+```
+
+2. 需要给出文件路径
+```js
+const image = 'file://path/to/image.png';
+const file = {
+    uri:
+        Platform.OS === 'ios'
+        ? image.replace('file://', '')
+        : image,
+    name: `photo.${fileType}`,
+    type: `image/${fileType}`,
+};
+```
+不知道为什么，直接传Blob并不能上传成功
+
+## 参考
+
+https://github.com/facebook/react-native/issues/35698
+
+
