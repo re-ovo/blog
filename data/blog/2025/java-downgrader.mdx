@@ -1,0 +1,67 @@
+---
+title: Java Downgrader在Gradle中的使用
+date: 2025-01-11
+tags: ['Java']
+summary: 在Gradle中使用Java Downgrader降级Java字节码版本
+---
+
+## 前言
+
+随着Java的不断更新，越来越多的项目也迁移到了新的Java版本，然而，在某些特定领域，我们仍然需要编译出来的字节码使用较低的
+版本，从而可以在不同版本的Java中运行。
+
+例如，在Minecraft Java服务端插件开发中，很多时候需要兼容 1.8.8 到最新的服务端版本，然而，1.8.8的服务端仍然使用Java8，
+最新的服务端版本则通常会跟随Java LTS版本，例如1.21.x使用Java 21。
+
+我们期望编译出来的字节码可以在Java 8到Java 21中运行，一个办法是直接编译到Java 8，但是很多时候我们又需要依赖于最新的Paper
+API，而Paper API通常使用最新的Java LTS, 这会导致无法编译。
+
+如果尝试编译，Gradle通常会给出类似的错误：
+
+```
+
+```
+
+## 解决方案
+
+其实前端开发中，也有类似的场景，例如，我们期望编译出来的JavaScript代码可以在ES5中运行，但是很多时候我们又需要使用ES6的语法，
+这时候，我们就可以使用Babel将ES6的代码转换为ES5的代码。
+
+那么Java这边是不是也可以使用类似的方式呢？
+
+答案是肯定的，经过搜索，发现了以下工具:
+
+- [Java Downgrader](https://github.com/unimined/JvmDowngrader)
+- [Jabel (已经停止维护)](https://github.com/bsideup/jabel)
+
+因此，我们选择使用Java Downgrader来实现Java字节码的降级。
+
+## 使用
+
+参考Java Downgrader的文档，我们可以使用它的Gradle插件来实现Java字节码的降级。
+
+```kts
+plugins {
+    id("xyz.wagyourtail.jvmdowngrader") version "1.2.1"
+}
+
+tasks {
+    withType(DowngradeJar::class.java) {
+        // 降级为 Java 8
+        downgradeTo.set(JavaVersion.VERSION_1_8)
+    }
+
+    withType(ShadeJar::class.java) {
+        // 降级为 Java 8
+        downgradeTo.set(JavaVersion.VERSION_1_8)
+    }
+
+    assemble {
+        // 因为降级需要依赖一下兼容的API，所以最好打包进去
+        dependsOn(shadeDowngradedApi)
+    }
+}
+```
+
+以上代码配置了Java Downgrader的Gradle插件，并指定了降级到的Java版本为1.8。
+
