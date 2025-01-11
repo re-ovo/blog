@@ -13,13 +13,20 @@ summary: 在Gradle中使用Java Downgrader降级Java字节码版本
 例如，在Minecraft Java服务端插件开发中，很多时候需要兼容 1.8.8 到最新的服务端版本，然而，1.8.8的服务端仍然使用Java8，
 最新的服务端版本则通常会跟随Java LTS版本，例如1.21.x使用Java 21。
 
-我们期望编译出来的字节码可以在Java 8到Java 21中运行，一个办法是直接编译到Java 8，但是很多时候我们又需要依赖于最新的Paper
+我们期望编译出来的字节码可以在Java 8到Java 21中运行，一个办法是直接设置语言版本为Java 8，但是很多时候我们又需要依赖于最新的Paper
 API，而Paper API通常使用最新的Java LTS, 这会导致无法编译。
 
 如果尝试编译，Gradle通常会给出类似的错误：
 
 ```
+> Could not resolve all files for configuration ':compileClasspath'.
+   > Could not resolve io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT.
+     Required by:
+         root project :
+      > Dependency resolution is looking for a library compatible with JVM runtime version 8, but 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT:20250110.134712-81' is only compatible with JVM runtime version 21 or newer.
 
+* Try:
+> Change the dependency on 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT:20250110.134712-81' to an earlier version that supports JVM runtime version 8.
 ```
 
 ## 解决方案
@@ -65,3 +72,35 @@ tasks {
 
 以上代码配置了Java Downgrader的Gradle插件，并指定了降级到的Java版本为1.8。
 
+## 依赖降级
+
+为了依赖更多的现代jars, 我们可以对依赖也进行降级
+
+```kts:?
+// 创建一个新的configuration
+val compileOnlyDowngrade by configurations.creating
+
+configurations {
+    compileOnly {
+        extendsFrom(compileOnlyDowngrade) // 继承compileOnly
+    }
+}
+
+jvmdg.dg(compileOnlyDowngrade) {
+    downgradeTo = JavaVersion.VERSION_1_8 // default
+}
+
+dependencies {
+    // compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+
+    // 使用新的configuration来添加依赖
+    compileOnlyDowngrade("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+}
+```
+
+这样，Java Downgrader会自动将依赖降级到Java 8
+
+## 总结
+
+通过使用Java Downgrader，我们可以方便地对Java字节码进行降级，从而在不同的Java版本中运行，对于有兼容性要求的项目，
+可以考虑使用这种方式来实现。
