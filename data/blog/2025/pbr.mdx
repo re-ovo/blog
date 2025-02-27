@@ -1,0 +1,348 @@
+---
+title: PBR渲染与全局光照入门
+date: 2025-02-27
+tags: [PBR, Computer Graphics]
+summary: 一文了解PBR渲染的原理与全局光照
+---
+
+## 什么是PBR渲染
+
+图形学中一大追求就是真实感，Physically Based Rendering(PBR) 是一种计算机图形学中的渲染技术，它通过模拟光线与物体表面之间的物理交互来生成逼真的图像。
+PBR的核心思想是使用基于物理的材质和光照模型，以确保渲染结果在视觉上更加真实。
+
+## 渲染方程
+
+要追求真实感渲染，其实就是要求解渲染方程。渲染方程是图形学中描述光线传播的方程，它描述了光线在场景中传播的物理过程。
+它由James T. Kajiya在1986年提出，是计算机图形学中描述光线传播的方程:
+
+$$
+L_o(p, \omega_o) = L_e(p, \omega_o) + \int_{\Omega} f_r(p, \omega_i, \omega_o) L_i(p, \omega_i) \cos \theta_i d\omega_i
+$$
+
+其中：
+- $L_o(p, \omega_o)$ 是出射辐射度
+- $L_e(p, \omega_o)$ 是自发光辐射度
+- $f_r(p, \omega_i, \omega_o)$ 是BRDF
+- $L_i(p, \omega_i)$ 是入射辐射度
+- $\theta_i$ 是入射光与表面法线的夹角
+- $\Omega$ 是所有入射方向的集合, 积分符号表示对所有入射方向的积分
+
+渲染方程初看很复杂，但其实意义就是：
+
+> 任何一点在某方向的出射光 = 该点自发光 + 所有入射光在该方向上对出射光的贡献
+
+举个例子，假设有一个纯反射光线的物体，那么一束光线(入射光)打到物体表面，会发生漫反射或镜面反射，形成出射光。
+然而入射光在整个物体表面半球空间上都有分布，所以需要对所有入射光进行积分，计算每个方向的入射光对指定方向出射光的贡献。
+
+## BRDF
+
+BRDF(Bidirectional Reflectance Distribution Function) 是描述光线在物体表面反射的函数。它描述了入射光在物体表面反射的分布情况。
+
+$$
+f_r(p, \omega_i, \omega_o) = \frac{dL_r(p, \omega_o)}{dE(p, \omega_i)}
+$$
+
+其中：
+- $p$ 是物体表面上的点
+- $\omega_i$ 是入射光方向
+- $\omega_o$ 是出射光方向
+- $L_r(p, \omega_o)$ 是出射光辐射度
+- $E(p, \omega_i)$ 是入射光辐射度
+
+
+说人话就是它描述了入射光打到物体表面后，有多少能量会被反射到指定方向。
+
+BRDF有很多实现，比如Lambertian BRDF，Phong BRDF，Blinn-Phong BRDF，Cook-Torrance BRDF等。
+
+### Lambertian BRDF
+
+Lambertian BRDF 是描述漫反射的BRDF。它假设物体表面是粗糙的，入射光会向各个方向均匀散射。
+
+$$
+f_r(p, \omega_i, \omega_o) = \frac{\rho}{\pi}
+$$
+
+其中：
+- $\rho$ 是物体表面的反射率
+- $\pi$ 是圆周率
+
+### Phong BRDF
+
+Phong BRDF 是描述镜面反射的BRDF。它假设物体表面是光滑的，入射光会沿着反射方向反射。
+
+$$
+f_r(p, \omega_i, \omega_o) = k_s \frac{n+2}{2\pi} (\vec{r} \cdot \vec{v})^n
+$$
+
+其中：
+- $k_s$ 是镜面反射系数
+- $n$ 是光泽度，控制反射的锐利程度
+- $\vec{r}$ 是反射向量
+- $\vec{v}$ 是视线向量
+
+### Blinn-Phong BRDF
+
+Blinn-Phong BRDF 是Phong模型的改进版本，它使用半程向量来计算镜面反射，计算效率更高且在某些情况下更准确。
+
+$$
+f_r(p, \omega_i, \omega_o) = k_s \frac{n+8}{8\pi} (\vec{n} \cdot \vec{h})^n
+$$
+
+其中：
+- $k_s$ 是镜面反射系数
+- $n$ 是光泽度，控制反射的锐利程度
+- $\vec{n}$ 是表面法线
+- $\vec{h}$ 是半程向量，即入射光方向与视线方向的单位向量之和的归一化结果
+
+### Cook-Torrance BRDF
+
+Cook-Torrance BRDF 是描述微表面模型的BRDF。它假设物体表面是由很多微小的镜面反射面组成的，每个微表面都会根据法线分布函数(NDF)来决定它的朝向。
+
+$$
+f_r(p, \omega_i, \omega_o) = \frac{D(h) G(i, o, h) F(i, h)}{4(n \cdot i)(n \cdot o)}
+$$
+
+其中：
+- $D(h)$ 是法线分布函数
+- $G(i, o, h)$ 是几何函数
+- $F(i, h)$ 是菲涅尔函数
+- $n$ 是表面法线
+- $i$ 是入射光方向
+- $o$ 是出射光方向
+- $h$ 是半程向量
+
+Cook-Torrance BRDF 是基于物理的BRDF，它考虑了微表面的粗糙度、法线分布、几何遮挡等因素，能够生成更加真实的光照效果。
+因此，在PBR渲染中，Cook-Torrance BRDF 是最常用的BRDF。
+
+## 间接光照
+
+如果观察渲染方程右边的积分项，会发现它是一个半球积分，很显然这个积分没法直接求解。
+
+因此，在实时渲染中，我们通常指求解直接光照，也就是只考虑光源作为入射光，并且出射光方向就是观察方向。
+
+例如下面的Fragment Shader代码，就是计算直接光照:
+
+```glsl
+#version 300 es
+precision highp float;
+
+// 材质参数
+uniform vec3 u_Albedo;       // 反照率/基础颜色
+uniform float u_Metallic;    // 金属度
+uniform float u_Roughness;   // 粗糙度
+uniform float u_AO;          // 环境光遮蔽
+
+// 光照参数
+uniform vec3 u_LightColor;
+uniform vec3 u_LightPosition;
+uniform vec3 u_ViewPosition;
+
+in vec3 v_Position;
+in vec3 v_Normal;
+in vec3 v_FragPos;
+
+out vec4 o_FragColor;
+
+const float PI = 3.14159265359;
+
+// 法线分布函数 (GGX/Trowbridge-Reitz)
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+    
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    
+    return nom / max(denom, 0.001);
+}
+
+// 几何函数 (Smith's Schlick-GGX)
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+    
+    return nom / max(denom, 0.001);
+}
+
+// 联合几何函数
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    
+    return ggx1 * ggx2;
+}
+
+// 菲涅尔方程 (Fresnel-Schlick)
+vec3 FresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+// 用于间接光照的菲涅尔方程
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+void main() {
+    vec3 N = normalize(v_Normal);
+    vec3 V = normalize(u_ViewPosition - v_FragPos);
+    vec3 R = reflect(-V, N);
+    
+    // 计算基础反射率
+    vec3 F0 = vec3(0.04); 
+    F0 = mix(F0, u_Albedo, u_Metallic);
+    
+    // 反射率方程
+    vec3 Lo = vec3(0.0);
+    
+    // 计算直接光照
+    {
+        // 计算光照方向和半程向量
+        vec3 L = normalize(u_LightPosition - v_FragPos);
+        vec3 H = normalize(V + L);
+        
+        // 计算衰减
+        float distance = length(u_LightPosition - v_FragPos);
+        float attenuation = 1.0 / (distance * distance);
+        vec3 radiance = u_LightColor * attenuation;
+        
+        // Cook-Torrance BRDF
+        float NDF = DistributionGGX(N, H, u_Roughness);   
+        float G = GeometrySmith(N, V, L, u_Roughness);    
+        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+        
+        // 计算镜面反射项
+        vec3 numerator = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular = numerator / denominator;
+        
+        // 计算能量守恒
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - u_Metallic;
+        
+        // 计算最终的反射率
+        float NdotL = max(dot(N, L), 0.0);
+        Lo += (kD * u_Albedo / PI + specular) * radiance * NdotL;
+    }
+    
+    // 环境光（简单近似）
+    vec3 ambient = vec3(0.03) * u_Albedo * u_AO;
+    
+    // 最终颜色
+    vec3 color = ambient + Lo;
+    
+    // HDR色调映射
+    color = color / (color + vec3(1.0));
+    // Gamma校正
+    color = pow(color, vec3(1.0/2.2));
+    
+    o_FragColor = vec4(color, 1.0);
+}
+```
+
+虽然这样只考虑了直接光照，没有计算间接光照，但是已经可以让物体表面看起来有质感了。但是由于没有间接光照，物体看起来会比较暗，因为现实世界，光线会在
+物体之间不断反弹，最后照亮整个场景，即使这个物体背对光源。
+
+如果我们想进一步提高渲染的真实感，就需要计算间接光照。
+
+## 全局光照
+
+全局光照(Global Illumination) 是指在渲染过程中，考虑光线在场景中传播的物理过程，包括直接光照和间接光照。
+而实时全局光照(Real-Time Global Illumination) 是指在实时渲染中，实时的计算全局光照，这是图形学领域的圣杯，每年都有大量的论文研究这个课题。
+实时全局光照的难点在于，需要计算光线在场景中传播的物理过程，包括直接光照和间接光照。而光照会不断在物体之间反弹，最后照亮整个场景。考虑整个场景，这个计算量是非常大的。
+
+下面是介绍几种常见的全局光照实现。
+
+### 预计算
+
+预计算(Precompute) 是指在渲染之前，计算光照的分布情况，然后存储在纹理中，在渲染过程中使用。
+
+预计算最经典的应用就是环境贴图(Environment Map)，或者叫Cube Map，它可以把环境光存储在立方体纹理中，然后渲染的时候直接从立方体纹理中采样。
+
+例如要计算漫反射环境光，可以先计算环境贴图的辐照度(Irradiance)，然后存储在辐照度图(Irradiance Map)中，然后渲染的时候直接从辐照度图中采样。
+
+观察漫反射渲染方程:
+
+$$
+L_o(p, \omega_o) = \int_{\Omega} k_d \frac{\rho}{\pi} L_i(p, \omega_i) \cos \theta_i d\omega_i
+$$
+
+- $L_o(p, \omega_o)$ 是出射辐射度
+- $L_i(p, \omega_i)$ 是入射辐射度
+- $k_d$ 是漫反射系数，表明有多少能量被漫反射
+- $\rho$ 是反照率
+- $\pi$ 是圆周率
+- $\Omega$ 是所有入射方向的集合, 积分符号表示对所有入射方向的积分
+- $\theta_i$ 是入射光与表面法线的夹角
+
+注意到，漫反射环境光是各向同性的，所以积分结果与观察方向无关，只与表面法线有关。因此我们可以提取出常数项，得到:
+
+$$
+L_o(p, \omega_o) = \frac{\rho}{\pi} \int_{\Omega} L_i(p, \omega_i) \cos \theta_i d\omega_i
+$$
+
+然后我们就可以预计算积分结果，存储在辐照度图(Irradiance Map)中，存储每个法线方向的积分结果。
+
+还有其他一些预计算方法，例如 LightMap 和 球谐光照(Spherical Harmonic Lighting)。
+
+LightMap 是预计算光照的分布情况，然后存储在光照贴图(Light Map)中，光照贴图表示物体表面每个像素的光照情况。
+
+球谐光照(Spherical Harmonic Lighting) 是预计算光照的分布情况，然后存储在球谐系数(Spherical Harmonic Coefficients)中，球谐系数表示光照的分布情况。
+球谐函数可以用很少的系数表示光照的分布情况，用很少的内存存储光照的分布情况。
+
+### 光线追踪
+
+另外一个常见的全局光照实现是光线追踪(Ray Tracing)或者路径追踪(Path Tracing)，它直接暴力求解渲染方程。
+
+假设光从光源出发，经过若干次反射，最终到达相机，那么我们可以沿着这条路径，计算光照。但实际场景中，光线很少会进入相机，考虑到光路是可逆的，
+我们可以从相机出发，沿着光线反向追踪，直到打到光源，然后计算光照。
+
+因此，光线追踪的流程如下:
+
+1. 从相机出发，每个像素发射一条光线，沿着光线方向传播，直到打到光源或者场景中的其他物体
+2. 如果打到光源，则计算光照，如果打到物体，则根据物体的材质，计算反射光线方向和光照
+3. 沿着反射光线继续传播，重复步骤2，直到光线打到光源或者达到最大反射次数
+4. 将所有光线计算得到的光照相加，得到最终的光照
+
+这个过程的核心就是蒙特卡洛积分，通过随机采样，计算积分结果。
+
+对于一个积分:
+
+$$
+I = \int_a^b f(x) dx
+$$
+
+蒙特卡洛积分公式为:
+
+$$
+I \approx \frac{1}{N} \sum_{i=1}^N \frac{f(x_i)}{p(x_i)}
+$$
+
+我们会随机采样$N$个点，然后计算这些点对应的函数值的平均值，然后乘以积分区间长度，得到积分结果。在路径追踪中，我们就是随机采样光线方向，然后计算光照。然后
+对于每个像素，我们会发射大量的光线，然后计算这些光线对应的光照的平均值，然后得到最终的光照。随着采样数量$N$的增加，计算结果会越来越接近真实值。
+
+当然，如果只是均匀采样，那么计算结果会非常慢，因此我们需要使用重要性采样(Importance Sampling)，根据光照的分布情况，选择更重要的光线方向进行采样。
+
+我使用WebGPU Compute Shader实现了路径追踪，参考 [wgpu-path-tracing](https://github.com/re-ovo/wgpu-path-tracing)
+
+## 总结
+
+要想实现真实感渲染，就求解渲染方程。其中2个重要点，一个BRDF，一个半球积分。
+
+- BRDF无论是实时渲染还是离线渲染，相对都容易求解。
+- 半球积分是难点，实时渲染很难直接求解，需要使用预计算或者硬件光线追踪或者用一些近似方法逼近。
+
+
+
+
+
+
+
